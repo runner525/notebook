@@ -1,0 +1,129 @@
+// 初始化引擎
+CronetEngine.Builder myBuilder = new CronetEngine.Builder(context);
+CronetEngine cronetEngine = myBuilder.build();
+
+// 创建请求线程
+Executor executor = Executors.newSingleThreadExecutor();
+
+// 创建UrlRequest
+UrlRequest.Builder requestBuilder = cronetEngine.newUrlRequestBuilder(
+        "https://www.example.com", new MyUrlRequestCallback(), executor);
+UrlRequest request = requestBuilder.build();
+
+// 发起请求
+request.start();
+
+// 网络状态回调
+class MyUrlRequestCallback extends UrlRequest.Callback {
+  private static final String TAG = "MyUrlRequestCallback";
+
+  @Override
+  public void onRedirectReceived(UrlRequest request, UrlResponseInfo info, String newLocationUrl) {
+    android.util.Log.i(TAG, "onRedirectReceived method called.");
+    // You should call the request.followRedirect() method to continue
+    // processing the request.
+    request.followRedirect();
+  }
+
+  @Override
+  public void onResponseStarted(UrlRequest request, UrlResponseInfo info) {
+    android.util.Log.i(TAG, "onResponseStarted method called.");
+    // You should call the request.read() method before the request can be
+    // further processed. The following instruction provides a ByteBuffer object
+    // with a capacity of 102400 bytes to the read() method.
+    request.read(ByteBuffer.allocateDirect(102400));
+  }
+
+  @Override
+  public void onReadCompleted(UrlRequest request, UrlResponseInfo info, ByteBuffer byteBuffer) {
+    android.util.Log.i(TAG, "onReadCompleted method called.");
+    // You should keep reading the request until there's no more data.
+    request.read(ByteBuffer.allocateDirect(102400));
+  }
+
+  @Override
+  public void onSucceeded(UrlRequest request, UrlResponseInfo info) {
+    android.util.Log.i(TAG, "onSucceeded method called.");
+  }
+}
+
+快捷键
+Ctrl+Shift+[	折叠当前代码块
+Ctrl+Shift+]	展开当前代码块
+
+Ctrl+Shift+O	跳转到符号
+Ctrl+G	跳转到行
+Ctrl+P	跳转到文件
+
+https://zhuanlan.zhihu.com/p/145761323
+
+
+平台接口层components\cronet\android\api\src\org\chromium\net\CronetEngine.java
+继承关系：CronetUrlRequestContext->CronetEngineBase->ExperimentalCronetEngine->CronetEngine
+components\cronet\android\java\src\org\chromium\net\impl\CronetUrlRequestContext.java
+
+
+
+平台实现层components\cronet\android\java\src\org\chromium\net\impl\CronetUrlRequest.java
+
+共用接口层components\cronet\android\cronet_url_request_adapter.h
+
+网络栈接口层net\url_request\url_request.cc
+
+(为什么两个相同的类)components\cronet\native\url_request.cc
+
+应用协议层net\url_request\url_request_http_job.cc
+
+
+Request.start流程
+JAVA
+UrlRequest.start
+CronetUrlRequest.start 通过jni的方式(CronetUrlRequestJni.get().createRequestAdapter)创建C层request对象，然后通过jni静态函数request的相关参数
+
+JNI层。静态函数。创建C层request对象 (An adapter from Java CronetUrlRequest object to native CronetURLRequest.)
+JNI_CronetUrlRequest_CreateRequestAdapter(components\cronet\android\cronet_url_request_adapter.cc) 
+CronetURLRequestAdapter : public CronetURLRequest::Callback
+
+C++
+CronetURLRequest::Start         (components\cronet\cronet_url_request.cc)
+在网络线程执行：CronetURLRequest::NetworkTasks::Start
+URLRequestContext::CreateRequest(net\url_request\url_request_context.cc)
+URLRequest::URLRequest          (net\url_request\url_request.cc)
+URLRequest::Start()
+URLRequest::StartJob
+URLRequestJobFactory::CreateJob (net\url_request\url_request_job_factory.cc)
+URLRequestJobFactory::ProtocolHandler::CreateJob
+URLRequestHttpJob::Create()     (net\url_request\url_request_http_job.cc)
+URLRequestHttpJob::Start()
+URLRequestHttpJob::AddCookieHeaderAndStart
+URLRequestHttpJob::StartTransaction
+URLRequestHttpJob::StartTransactionInternal
+HttpNetworkTransaction表示一个直接的网络事务，可以理解为一个网络连接。HttpNetworkSession用于管理网络连接。
+***HttpNetworkTransaction::Start   (net\http\http_network_transaction.cc) (DoLoop(OK);状态机：STATE_NOTIFY_BEFORE_CREATE_STREAM，STATE_CREATE_STREAM)
+HttpNetworkTransaction::DoCreateStream
+	HttpStreamFactory::JobController::DoLoop (net\http\http_stream_factory_job_controller.cc)  (状态机) 涉及到预链接，quic
+		HttpStreamRequest::HttpStreamRequest(net\http\http_stream_request.cc)
+		HttpStreamRequest::InitializeStream
+	HttpStreamFactory::JobFactory::CreateMainJob(net\http\http_stream_factory_job.cc)
+	HttpStreamFactory::Job::Start (Jon初始化时会构造socket对象connection_(ClientSocketHandle)),ClientSocketHandle调用TransportClientSocketPool::RequestSocket获取socket
+	HttpStreamFactory::Job::StartInternal()
+    HttpStreamFactory::Job::RunLoop (状态机)
+	HttpStreamFactory::Job::DoInitConnectionImpl
+	InitSocketHandleForHttpRequest              (net\socket\client_socket_pool_manager.cc)
+	HttpStreamFactory::Job::OnIOComplete
+HttpNetworkTransaction::DoSendRequest
+HttpStreamParser::SendRequest					(net\http\http_stream_parser.cc)
+HttpStreamParser::DoSendHeaders()
+HttpProxyClientSocket::Write					(net\http\http_proxy_client_socket.cc)
+SOCKSClientSocket::Write						(net\socket\socks_client_socket.cc)
+...
+URLRequestHttpJob::OnStartCompleted
+URLRequestHttpJob::OnHeadersReceivedCallback
+URLRequestHttpJob::SaveCookiesAndNotifyHeadersComplete
+URLRequestJob::NotifyHeadersComplete()
+URLRequest::NotifyResponseStarted               delegate_->OnResponseStarted
+CronetURLRequest::NetworkTasks::OnResponseStarted
+
+
+
+
