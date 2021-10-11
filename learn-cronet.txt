@@ -57,6 +57,8 @@ Ctrl+P	跳转到文件
 
 https://zhuanlan.zhihu.com/p/145761323
 
+cronet对外暴露的native接口：components\cronet\native\generated\cronet.idl_c.h (Generated from components/cronet/native/generated/cronet.idl)
+
 
 平台接口层components\cronet\android\api\src\org\chromium\net\CronetEngine.java
 继承关系：CronetUrlRequestContext->CronetEngineBase->ExperimentalCronetEngine->CronetEngine
@@ -125,5 +127,14 @@ URLRequest::NotifyResponseStarted               delegate_->OnResponseStarted
 CronetURLRequest::NetworkTasks::OnResponseStarted
 
 
+预连接
+NetworkContext::PreconnectSockets  (services\network\network_context.h)
+HttpStreamFactory::PreconnectStreams    (net\http\http_stream_factory.cc)
+HttpStreamFactory::JobController::Preconnect
+HttpStreamFactory::Job::Preconnect
+TransportClientSocketPool::RequestSockets
+ClientSocketPool::CreateConnectJob
+ConnectJob::CreateConnectJob
+HttpStreamFactory::Job::OnPreconnectsComplete
 
 
